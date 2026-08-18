@@ -1,10 +1,19 @@
 #include "net/socket.hpp"
 #include "net/net_except.hpp"
+#include "net/socket_address.hpp"
 #include "net/socket_config.hpp"
+#include <cerrno>
+#include <cstddef>
 #include <iostream>
+#include <netinet/in.h>
+#include <span>
+#include <string>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <utility>
+
+
 namespace net
 {
 	Socket::Socket(int fd, socket_config cfg) : sock_cfg(std::move(cfg)), sock_fd(fd)
@@ -19,8 +28,8 @@ namespace net
 		}
 	}
 
-	Socket::Socket(const socket_config& cfg) : 
-				sock_cfg(cfg), 
+	Socket::Socket(socket_config cfg) : 
+				sock_cfg(std::move(cfg)), 
 				sock_fd(socket(static_cast<int>(sock_cfg.domain), static_cast<int>(sock_cfg.typ), static_cast<int>(sock_cfg.proto)))
 	{
 		if (sock_fd < 0)
@@ -29,10 +38,8 @@ namespace net
 		}
 	}
 
-	Socket::Socket(Socket&& other) noexcept
+	Socket::Socket(Socket&& other) noexcept : sock_cfg(std::move(other.sock_cfg)), sock_fd(other.sock_fd)
 	{
-		sock_cfg = other.sock_cfg;
-		sock_fd = other.sock_fd;
 		other.sock_cfg = {};
 		other.sock_fd = -1;
 	}

@@ -44,7 +44,7 @@ namespace net
 	public:
 		~Socket();
 
-		Socket(const socket_config& cfg);
+		Socket(socket_config cfg);
 
 		Socket(const Socket&) = delete;
 		Socket& operator=(const Socket&) = delete;
