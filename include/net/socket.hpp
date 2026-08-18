@@ -39,7 +39,7 @@ namespace net
 		socket_config sock_cfg{};
 		sockfd_t sock_fd{-1};
 
-		Socket(int fd, const socket_config& cfg);
+		Socket(int fd, socket_config cfg);
 
 	public:
 		~Socket();
