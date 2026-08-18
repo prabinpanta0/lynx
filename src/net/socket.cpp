@@ -2,13 +2,13 @@
 #include "net/net_except.hpp"
 #include "net/socket_config.hpp"
 #include <iostream>
+#include <sys/socket.h>
 #include <unistd.h>
+#include <utility>
 namespace net
 {
-	Socket::Socket(int fd, const socket_config& cfg)
+	Socket::Socket(int fd, socket_config cfg) : sock_cfg(std::move(cfg)), sock_fd(fd)
 	{
-		sock_cfg = cfg;
-		sock_fd = fd;
 	}
 
 	Socket::~Socket()
@@ -19,13 +19,10 @@ namespace net
 		}
 	}
 
-	Socket::Socket(const socket_config& cfg)
+	Socket::Socket(const socket_config& cfg) : 
+				sock_cfg(cfg), 
+				sock_fd(socket(static_cast<int>(sock_cfg.domain), static_cast<int>(sock_cfg.typ), static_cast<int>(sock_cfg.proto)))
 	{
-		sock_cfg = cfg;
-
-		sock_fd =
-			socket(static_cast<int>(sock_cfg.domain), static_cast<int>(sock_cfg.typ), static_cast<int>(sock_cfg.proto));
-
 		if (sock_fd < 0)
 		{
 			throw net_except("Failed to create a socket.");
