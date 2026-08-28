@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 namespace net
 {
-	struct socket_address
+	struct Socket_address
 	{
 		std::string ip{"0.0.0.0"};
 		uint16_t port{8080};
@@ -14,7 +14,7 @@ namespace net
 		[[nodiscard]] sockaddr_in to_sockaddr_in() const;
 	};
 
-	[[nodiscard]] bool is_valid_ipv4(const std::string& ip);
-	[[nodiscard]] bool is_valid_port(const int port_no);
+	[[nodiscard]] inline bool is_valid_ipv4(const std::string& ip);
+	[[nodiscard]] inline bool is_valid_port(const int port_no);
 
 } // namespace net

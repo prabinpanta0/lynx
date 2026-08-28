@@ -7,7 +7,7 @@
 
 namespace net
 {
-	sockaddr_in socket_address::to_sockaddr_in() const
+	sockaddr_in Socket_address::to_sockaddr_in() const
 	{
 		sockaddr_in addr{};
 		addr.sin_family = AF_INET;

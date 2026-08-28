@@ -58,7 +58,7 @@ namespace net
 		return *this;
 	}
 
-	void Socket::bind(const socket_address& sock_addr)
+	void Socket::bind(const Socket_address& sock_addr)
 	{
 		sockaddr_in addr = sock_addr.to_sockaddr_in();
 

@@ -57,7 +57,7 @@ TEST_CASE("Socket bind", "[socket][bind]")
 	SECTION("valid bind")
 	{
 		net::Socket s(cfg);
-		net::socket_address addr{"127.0.0.1", 9300};
+		net::Socket_address addr{"127.0.0.1", 9300};
 
 		s.bind(addr);
 	}
@@ -65,14 +65,14 @@ TEST_CASE("Socket bind", "[socket][bind]")
 	SECTION("invalid ip")
 	{
 		net::Socket s(cfg);
-		net::socket_address addr{"999.999.999.999", 0};
+		net::Socket_address addr{"999.999.999.999", 0};
 
 		CHECK_THROWS_AS(s.bind(addr), net::net_except);
 	}
 
 	SECTION("port already in use")
 	{
-		net::socket_address addr{"127.0.0.1", 9301};
+		net::Socket_address addr{"127.0.0.1", 9301};
 
 		net::Socket s1(cfg);
 		net::Socket s2(cfg);
@@ -90,7 +90,7 @@ TEST_CASE("Socket listen", "[socket][listen]")
 	SECTION("listen after bind")
 	{
 		net::Socket s(cfg);
-		net::socket_address addr{"127.0.0.1", 9302};
+		net::Socket_address addr{"127.0.0.1", 9302};
 
 		s.bind(addr);
 		s.listen();
@@ -100,7 +100,7 @@ TEST_CASE("Socket listen", "[socket][listen]")
 TEST_CASE("Socket accept", "[socket][accept]")
 {
 	net::socket_config cfg;
-	net::socket_address addr{"127.0.0.1", 9303};
+	net::Socket_address addr{"127.0.0.1", 9303};
 
 	net::Socket server(cfg);
 
@@ -127,7 +127,7 @@ TEST_CASE("Socket accept", "[socket][accept]")
 TEST_CASE("Socket send receive", "[socket][io]")
 {
 	net::socket_config cfg;
-	net::socket_address addr{"127.0.0.1", 9304};
+	net::Socket_address addr{"127.0.0.1", 9304};
 
 	net::Socket server(cfg);
 
@@ -172,7 +172,7 @@ TEST_CASE("Socket send receive", "[socket][io]")
 TEST_CASE("Socket large payload", "[socket][large]")
 {
 	net::socket_config cfg;
-	net::socket_address addr{"127.0.0.1", 9305};
+	net::Socket_address addr{"127.0.0.1", 9305};
 
 	net::Socket server(cfg);
 
