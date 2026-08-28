@@ -14,7 +14,7 @@ namespace net
 		[[nodiscard]] sockaddr_in to_sockaddr_in() const;
 	};
 
-	[[nodiscard]] inline bool is_valid_ipv4(const std::string& ip);
-	[[nodiscard]] inline bool is_valid_port(const int port_no);
+	[[nodiscard]] bool is_valid_ipv4(const std::string& ip);
+	[[nodiscard]] bool is_valid_port(const int port_no);
 
 } // namespace net
