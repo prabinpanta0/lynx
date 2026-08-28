@@ -2,14 +2,11 @@
 #include "net/net_except.hpp"
 #include "net/socket_address.hpp"
 #include "net/socket_config.hpp"
-#include <cerrno>
 #include <cstddef>
 #include <iostream>
-#include <netinet/in.h>
 #include <span>
 #include <string>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
 #include <utility>
 
