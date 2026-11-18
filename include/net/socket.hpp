@@ -1,78 +1,88 @@
 #pragma once
 
+/*********************************************************
+ *  ____     ___     ____   _  __  _____   _____      	 *
+ * / ___|   / _ \   / ___| | |/ / | ____| |_   _|     	 *
+ * \___ \  | | | | | |     | ' /  |  _|     | |       	 *
+ *  ___) | | |_| | | |___  | . \  | |___    | |       	 *
+ * |____/   \___/   \____| |_|\_\ |_____|   |_|       	 *
+ *                                                       *
+ * socket is an RAII abstraction over platform sockets.  *
+ * It provides a platform-independent API and is         *
+ * move-only, with copying explicitly disabled.          *
+ *********************************************************/
 
 #include "net/socket_address.hpp"
 #include "net/socket_config.hpp"
 #include "net/socket_type.hpp"
+#include <arpa/inet.h>
+#include <cerrno>
 #include <cstddef>
+#include <expected>
 #include <span>
-
-
-/******************************************************
- * __        _____ _   _ ____   _____        ______   *
- * \ \      / /_ _| \ | |  _ \ / _ \ \      / / ___|  *
- *  \ \ /\ / / | ||  \| | | | | | | \ \ /\ / /\___ \  *
- *   \ V  V /  | || |\  | |_| | |_| |\ V  V /  ___) | *
- *    \_/\_/  |___|_| \_|____/ \___/  \_/\_/  |____/  *
- * 													  * 
- ******************************************************/
-#if defined(_WIN32) || defined(__WIN64__) || defined(WIN32) || defined(__WIN32__ )
-	#ifndef WIN32_LEAN_AND_MEAN
-		#define WIN32_LEAN_AND_MEAN
-	#endif
-	#include <winsock2.h>
-	#include <ws2tcpip.h>
-
-	using sockfd_t = SOCKET;
-	using ssize_t = std::size_t;
-
-	#define INVALID_SOCKET_VAL INVALID_SOCKET
-
-#else
-/***************************
- *	 _   _ _   _ _____  __ *
- *	| | | | \ | |_ _\ \/ / *
- *	| | | |  \| || | \  /  *
- *	| |_| | |\  || | /  \  *
- *	 \___/|_| \_|___/_/\_\ *
- *	   					   *
- ***************************/
-	#include <sys/socket.h>
-	#include <arpa/inet.h>
-	#include <unistd.h>
-	#include <sys/types.h>
-	
-	using sockfd_t = int;
-	#define INVALID_SOCKET_VAL (-1)
-#endif
-
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <system_error>
+#include <unistd.h>
 
 namespace net
 {
-	class Socket
+	using sockfd_t = int;
+	inline constexpr sockfd_t INVALID_SOCKET_VAL{-1};
+
+	enum class socket_operation
+	{
+		create,
+		bind,
+		listen,
+		accept,
+		send,
+		receive
+	};
+
+	struct socket_error
+	{
+		std::error_code code;
+		socket_operation operation;
+	};
+
+	/// A move-only RAII wrapper around a platform socket descriptor.
+	class socket
 	{
 	private:
+		// Default Initialize with invalid state
 		socket_config sock_cfg{};
 		sockfd_t sock_fd{-1};
 
-		Socket(int fd, socket_config cfg);
+		// Private constructor, used only by accept
+		socket(int fd, socket_config cfg);
 
 	public:
-		~Socket();
+		/// Closes the owned socket descriptor, if any.
+		~socket();
 
-		Socket(socket_config cfg);
+		/// Creates a socket using the supplied domain, type, and protocol.
+		socket(socket_config cfg);
 
-		Socket(const Socket&) = delete;
-		Socket& operator=(const Socket&) = delete;
+		socket(const socket&) = delete;
+		socket& operator=(const socket&) = delete;
 
-		Socket(Socket&& other) noexcept;
-		Socket& operator=(Socket&& other) noexcept;
+		socket(socket&& other) noexcept;
+		socket& operator=(socket&& other) noexcept;
 
-		void bind(const Socket_address& sock_addr);
-		void listen(int backlog = SOMAXCONN);
-		[[nodiscard]] Socket accept();
+		/// Associates the socket descriptor with the given local address.
+		[[nodiscard]] std::expected<void, socket_error> bind(const socket_address& sock_addr);
 
-		ssize_t send(std::span<const std::byte> data);
-		ssize_t receive(std::span<std::byte> buffer);
+		/// Marks the socket as passive and enables incoming connections.
+		[[nodiscard]] std::expected<void, socket_error> listen(int backlog = SOMAXCONN);
+
+		/// Accepts one incoming connection and returns its dedicated socket.
+		[[nodiscard]] std::expected<socket, socket_error> accept();
+
+		/// Sends all bytes in data and returns the number of bytes sent.
+		[[nodiscard]] std::expected<ssize_t, socket_error> send(std::span<const std::byte> data);
+
+		/// Reads available bytes into buffer and returns the bytes received.
+		[[nodiscard]] std::expected<ssize_t, socket_error> receive(std::span<std::byte> buffer);
 	};
 } // namespace net
