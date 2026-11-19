@@ -28,7 +28,7 @@ namespace ui
 	void menu_renderer::show_type_menu()
 	{
 		const int opt_width = 4;
-		std::cout << "\n" << color::bold << "Select Socket Type:" << color::reset << "\n";
+		std::cout << "\n" << color::bold << "Select socket Type:" << color::reset << "\n";
 
 		std::cout << std::left << std::setw(opt_width) << "1."
 				  << "TCP " << color::cyan << "(Stream)" << color::reset << "\n";

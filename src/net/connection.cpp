@@ -15,7 +15,7 @@
 #include <unistd.h>
 namespace net
 {
-	void handle_http_client(Socket&& client, http::router& router_) noexcept
+	void handle_http_client(socket&& client, http::router& router_) noexcept
 	{
 		try
 		{

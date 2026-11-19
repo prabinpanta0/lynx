@@ -10,8 +10,8 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <unistd.h>
 #include <thread>
+#include <unistd.h>
 #include <utility>
 #include <vector>
 
@@ -21,42 +21,42 @@
 
 using namespace std::literals;
 
-TEST_CASE("Socket lifecycle", "[socket]")
+TEST_CASE("socket lifecycle", "[socket]")
 {
 	net::socket_config cfg;
 
 	SECTION("construction")
 	{
-		net::Socket s(cfg);
+		net::socket s(cfg);
 	}
 
 	SECTION("move constructor")
 	{
-		net::Socket a(cfg);
-		net::Socket b(std::move(a));
+		net::socket a(cfg);
+		net::socket b(std::move(a));
 	}
 
 	SECTION("move assignment")
 	{
-		net::Socket a(cfg);
-		net::Socket b(cfg);
+		net::socket a(cfg);
+		net::socket b(cfg);
 		b = std::move(a);
 	}
 
 	SECTION("self move assignment")
 	{
-		net::Socket s(cfg);
+		net::socket s(cfg);
 		s = std::move(s);
 	}
 }
 
-TEST_CASE("Socket bind", "[socket][bind]")
+TEST_CASE("socket bind", "[socket][bind]")
 {
 	net::socket_config cfg;
 
 	SECTION("valid bind")
 	{
-		net::Socket s(cfg);
+		net::socket s(cfg);
 		net::Socket_address addr{"127.0.0.1", 9300};
 
 		s.bind(addr);
@@ -64,7 +64,7 @@ TEST_CASE("Socket bind", "[socket][bind]")
 
 	SECTION("invalid ip")
 	{
-		net::Socket s(cfg);
+		net::socket s(cfg);
 		net::Socket_address addr{"999.999.999.999", 0};
 
 		CHECK_THROWS_AS(s.bind(addr), net::net_except);
@@ -74,8 +74,8 @@ TEST_CASE("Socket bind", "[socket][bind]")
 	{
 		net::Socket_address addr{"127.0.0.1", 9301};
 
-		net::Socket s1(cfg);
-		net::Socket s2(cfg);
+		net::socket s1(cfg);
+		net::socket s2(cfg);
 
 		s1.bind(addr);
 
@@ -83,13 +83,13 @@ TEST_CASE("Socket bind", "[socket][bind]")
 	}
 }
 
-TEST_CASE("Socket listen", "[socket][listen]")
+TEST_CASE("socket listen", "[socket][listen]")
 {
 	net::socket_config cfg;
 
 	SECTION("listen after bind")
 	{
-		net::Socket s(cfg);
+		net::socket s(cfg);
 		net::Socket_address addr{"127.0.0.1", 9302};
 
 		s.bind(addr);
@@ -97,12 +97,12 @@ TEST_CASE("Socket listen", "[socket][listen]")
 	}
 }
 
-TEST_CASE("Socket accept", "[socket][accept]")
+TEST_CASE("socket accept", "[socket][accept]")
 {
 	net::socket_config cfg;
 	net::Socket_address addr{"127.0.0.1", 9303};
 
-	net::Socket server(cfg);
+	net::socket server(cfg);
 
 	server.bind(addr);
 	server.listen();
@@ -119,17 +119,17 @@ TEST_CASE("Socket accept", "[socket][accept]")
 			::close(raw);
 		});
 
-	net::Socket conn = server.accept();
+	net::socket conn = server.accept();
 
 	client.join();
 }
 
-TEST_CASE("Socket send receive", "[socket][io]")
+TEST_CASE("socket send receive", "[socket][io]")
 {
 	net::socket_config cfg;
 	net::Socket_address addr{"127.0.0.1", 9304};
 
-	net::Socket server(cfg);
+	net::socket server(cfg);
 
 	server.bind(addr);
 	server.listen();
@@ -156,7 +156,7 @@ TEST_CASE("Socket send receive", "[socket][io]")
 			::close(raw);
 		});
 
-	net::Socket conn = server.accept();
+	net::socket conn = server.accept();
 
 	auto bytes = std::as_bytes(std::span(msg));
 
@@ -169,12 +169,12 @@ TEST_CASE("Socket send receive", "[socket][io]")
 	REQUIRE(received == msg);
 }
 
-TEST_CASE("Socket large payload", "[socket][large]")
+TEST_CASE("socket large payload", "[socket][large]")
 {
 	net::socket_config cfg;
 	net::Socket_address addr{"127.0.0.1", 9305};
 
-	net::Socket server(cfg);
+	net::socket server(cfg);
 
 	server.bind(addr);
 	server.listen();
@@ -209,7 +209,7 @@ TEST_CASE("Socket large payload", "[socket][large]")
 			::close(raw);
 		});
 
-	net::Socket conn = server.accept();
+	net::socket conn = server.accept();
 
 	ssize_t sent = conn.send(payload);
 

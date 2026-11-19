@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 namespace net
 {
-	struct Socket_address
+	struct socket_address
 	{
 		std::string ip{"0.0.0.0"};
 		uint16_t port{8080};

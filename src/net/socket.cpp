@@ -3,6 +3,7 @@
 #include "net/socket_address.hpp"
 #include "net/socket_config.hpp"
 #include <cstddef>
+#include <expected>
 #include <iostream>
 #include <span>
 #include <string>
@@ -10,38 +11,45 @@
 #include <unistd.h>
 #include <utility>
 
-
 namespace net
 {
-	Socket::Socket(int fd, socket_config cfg) : sock_cfg(std::move(cfg)), sock_fd(fd)
+
+	std::expected<socket, socket_error> socket::create(socket_config cfg)
+	{
+
+	};
+
+
+
+	// A private descriptor-taking constructor is used only by accept().
+	// It transfers an already-created OS socket into this socket instance
+	// while preserving the configuration of the listening socket.
+	socket::socket(int fd) : sock_fd{fd}
 	{
 	}
 
-	Socket::~Socket()
+	// RAII cleanup closes only valid descriptors. Descriptor ownership is
+	// transferred by move operations, which reset the moved-from descriptor
+	// to an invalid value so that its destructor does not close it again.
+	socket::~socket()
 	{
 		if (sock_fd >= 0)
 		{
-			close(sock_fd);
+			::close(sock_fd);
 		}
 	}
 
-	Socket::Socket(socket_config cfg) : 
-				sock_cfg(std::move(cfg)), 
-				sock_fd(socket(static_cast<int>(sock_cfg.domain), static_cast<int>(sock_cfg.typ), static_cast<int>(sock_cfg.proto)))
+	// Move construction transfers descriptor ownership out of other.
+	// The source is reset to -1 after the transfer so only this object closes
+	// the descriptor in its destructor.
+	socket::socket(socket&& other) noexcept : sock_fd{ std::exchange(other.sock_fd, INVALID_SOCKET_VAL )}
 	{
-		if (sock_fd < 0)
-		{
-			throw net_except("Failed to create a socket.");
-		}
 	}
 
-	Socket::Socket(Socket&& other) noexcept : sock_cfg(std::move(other.sock_cfg)), sock_fd(other.sock_fd)
-	{
-		other.sock_cfg = {};
-		other.sock_fd = -1;
-	}
-
-	Socket& Socket::operator=(Socket&& other) noexcept
+	// Move assignment closes the current descriptor before taking ownership
+	// of another socket. Self-move assignment is skipped because closing or
+	// resetting the existing object would destroy valid state.
+	socket& socket::operator=(socket&& other) noexcept
 	{
 		if (this != &other)
 		{
@@ -49,30 +57,33 @@ namespace net
 			{
 				close(sock_fd);
 			}
-			sock_cfg = std::move(other.sock_cfg);
 			sock_fd = other.sock_fd;
-
-			other.sock_cfg = {};
 			other.sock_fd = -1;
 		}
 		return *this;
 	}
 
-	void Socket::bind(const Socket_address& sock_addr)
+	// Convert the address to the native IPv4 representation, then associate
+	// it with this socket through bind(). A failure includes the requested
+	// address in net_except so the caller can identify the binding target.
+	std::expected<void, socket_error> socket::bind(const socket_address& sock_addr)
 	{
-		sockaddr_in addr = sock_addr.to_sockaddr_in();
+		sockaddr_in addr{sock_addr.to_sockaddr_in()};
 
 		if (::bind(sock_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0)
 		{
-			throw net_except("Failed to bind to " + sock_addr.ip + ":" + std::to_string(sock_addr.port));
 		}
 	}
 
-	void Socket::listen(int backlog)
+	// Listen switches the socket from active use to passive server mode.
+	// backlog is the maximum pending connection queue length; SOMAXCONN asks
+	// the platform to use a recommended large queue when no custom size is
+	// supplied.
+	std::expected<void, socket_error> socket::listen(int backlog)
 	{
 		if (sock_fd < 0)
 		{
-			throw net_except("Cannot listen: Socket uninitialized.");
+			throw net_except("Cannot listen: socket uninitialized.");
 		}
 
 		if (::listen(sock_fd, backlog) < 0)
@@ -80,10 +91,14 @@ namespace net
 			throw net_except("Failed to listen: ");
 		}
 
-		std::cout << "Socket is now listening...\n";
+		std::cout << "socket is now listening...\n";
 	}
 
-	Socket Socket::accept()
+	// accept() blocks until a connection arrives, then creates a separate
+	// socket from the returned descriptor. The returned socket owns the
+	// connected descriptor and does not share or invalidate the listening
+	// socket.
+	std::expected<socket, socket_error> socket::accept()
 	{
 		sockaddr_in client_addr{};
 		socklen_t client_len = sizeof(client_addr);
@@ -95,10 +110,14 @@ namespace net
 			throw net_except("Accept failed: ");
 		}
 
-		return Socket(client_fd, sock_cfg);
 	}
 
-	ssize_t Socket::send(std::span<const std::byte> data)
+	// send() can transfer only part of a span in one OS call. This loop
+	// advances through the remaining bytes until every byte is sent.
+	// EINTR is treated as a retryable interruption, while any other negative
+	// result is an OS error and is reported with the number of bytes already
+	// transferred.
+	std::expected<ssize_t, socket_error> socket::send(std::span<const std::byte> data)
 	{
 		size_t total_sent = 0;
 		while (total_sent < data.size())
@@ -120,7 +139,11 @@ namespace net
 		return static_cast<int>(total_sent);
 	}
 
-	ssize_t Socket::receive(std::span<std::byte> buffer)
+	// receive() performs one blocking read into the caller-provided buffer.
+	// An empty span requires no OS call and returns 0 immediately. EINTR
+	// retries the operation recursively; a positive result is the number of
+	// bytes written into the buffer, and 0 can indicate a closed connection.
+	std::expected<ssize_t, socket_error> socket::receive(std::span<std::byte> buffer)
 	{
 		if (buffer.empty())
 			return 0;

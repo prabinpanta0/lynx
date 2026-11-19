@@ -27,7 +27,7 @@ int main()
 		net::socket_config config{};
 		ui::terminal_ui::run(config);
 
-		net::Socket http_server(config);
+		net::socket http_server(config);
 		http_server.bind(config.sock_addr);
 		http_server.listen();
 
@@ -94,7 +94,7 @@ int main()
 		{
 			try
 			{
-				net::Socket client = http_server.accept();
+				net::socket client = http_server.accept();
 				utils::logger::log("New client connected.");
 
 				auto task = [client_socket = std::move(client), &router_]() mutable
