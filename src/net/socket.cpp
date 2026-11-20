@@ -1,7 +1,19 @@
 #include "net/socket.hpp"
-#include "net/net_except.hpp"
 #include "net/socket_address.hpp"
 #include "net/socket_config.hpp"
+#include "net/socket_type.hpp"
+
+/**********************************************************
+ *  ____   ___   ____ _  _______ _____                    *
+ * / ___| / _ \ / ___| |/ / ____|_   _|                   *
+ * \___ \| | | | |   | ' /|  _|   | |                     *
+ *  ___) | |_| | |___| . \| |___  | |                     *
+ * |____/ \___/ \____|_|\_\_____| |_|                     *
+ *                                                        *
+ * Socket descriptor implementation and operations.       *
+ **********************************************************/
+
+#include <cerrno>
 #include <cstddef>
 #include <expected>
 #include <iostream>
@@ -11,74 +23,62 @@
 #include <unistd.h>
 #include <utility>
 
-namespace net
+namespace lynx::net
 {
 
-	std::expected<socket, socket_error> socket::create(socket_config cfg)
-	{
-
-	};
-
-
-
-	// A private descriptor-taking constructor is used only by accept().
-	// It transfers an already-created OS socket into this socket instance
-	// while preserving the configuration of the listening socket.
-	socket::socket(int fd) : sock_fd{fd}
-	{
-	}
-
-	// RAII cleanup closes only valid descriptors. Descriptor ownership is
-	// transferred by move operations, which reset the moved-from descriptor
-	// to an invalid value so that its destructor does not close it again.
-	socket::~socket()
+	/*
+	 * Replaces the owned descriptor with "new_fd", closing the 
+	 * previous descriptor if it is valid.                         
+	 */
+	void socket::reset(const socket_handle new_fd) noexcept
 	{
 		if (sock_fd >= 0)
 		{
 			::close(sock_fd);
 		}
+		sock_fd = new_fd;
 	}
 
-	// Move construction transfers descriptor ownership out of other.
-	// The source is reset to -1 after the transfer so only this object closes
-	// the descriptor in its destructor.
-	socket::socket(socket&& other) noexcept : sock_fd{ std::exchange(other.sock_fd, INVALID_SOCKET_VAL )}
+	/*
+	 * Closes the owned descriptor through RAII cleanup.    
+	 * Move operations invalidate the source descriptor.    
+	 */
+	socket::~socket()
 	{
+		reset();
 	}
 
-	// Move assignment closes the current descriptor before taking ownership
-	// of another socket. Self-move assignment is skipped because closing or
-	// resetting the existing object would destroy valid state.
-	socket& socket::operator=(socket&& other) noexcept
+	/*
+	 * Creates a socket using the supplied configuration.
+	 */
+	std::expected<socket, socket_error> socket::create(const socket_config& config) noexcept
 	{
-		if (this != &other)
+		const auto fd{::socket(static_cast<int>(config.domain),
+																   static_cast<int>(config.type),
+																   static_cast<int>(config.protocol))};
+		if ( static_cast<socket_handle>(fd) == invalid_socket_fd)
 		{
-			if (sock_fd >= 0)
-			{
-				close(sock_fd);
-			}
-			sock_fd = other.sock_fd;
-			other.sock_fd = -1;
+			const int error{errno};
+			return make_error(socket_operation::create, error);
 		}
-		return *this;
-	}
+		return socket{fd};
+	};
 
-	// Convert the address to the native IPv4 representation, then associate
-	// it with this socket through bind(). A failure includes the requested
-	// address in net_except so the caller can identify the binding target.
-	std::expected<void, socket_error> socket::bind(const socket_address& sock_addr)
+
+
+	/*
+	 * Converts the address to native form and binds the     
+	 * socket to that local endpoint.                        
+	 */
+	std::expected<void, socket_error> socket::bind(const socket_address& sock_addr)noexcept
 	{
-		sockaddr_in addr{sock_addr.to_sockaddr_in()};
 
-		if (::bind(sock_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0)
-		{
-		}
 	}
 
-	// Listen switches the socket from active use to passive server mode.
-	// backlog is the maximum pending connection queue length; SOMAXCONN asks
-	// the platform to use a recommended large queue when no custom size is
-	// supplied.
+	/********************************************************
+	 * Switches the socket into passive listening mode.      *
+	 * Backlog controls the pending connection queue size.   *
+	 ********************************************************/
 	std::expected<void, socket_error> socket::listen(int backlog)
 	{
 		if (sock_fd < 0)
@@ -94,10 +94,10 @@ namespace net
 		std::cout << "socket is now listening...\n";
 	}
 
-	// accept() blocks until a connection arrives, then creates a separate
-	// socket from the returned descriptor. The returned socket owns the
-	// connected descriptor and does not share or invalidate the listening
-	// socket.
+	/********************************************************
+	 * Blocks until an incoming connection arrives, then     *
+	 * creates a socket that owns the accepted descriptor.   *
+	 ********************************************************/
 	std::expected<socket, socket_error> socket::accept()
 	{
 		sockaddr_in client_addr{};
@@ -109,14 +109,12 @@ namespace net
 		{
 			throw net_except("Accept failed: ");
 		}
-
 	}
 
-	// send() can transfer only part of a span in one OS call. This loop
-	// advances through the remaining bytes until every byte is sent.
-	// EINTR is treated as a retryable interruption, while any other negative
-	// result is an OS error and is reported with the number of bytes already
-	// transferred.
+	/********************************************************
+	 * Sends all remaining bytes in a loop. Interrupted      *
+	 * writes are retried; other failures return an error.   *
+	 ********************************************************/
 	std::expected<ssize_t, socket_error> socket::send(std::span<const std::byte> data)
 	{
 		size_t total_sent = 0;
@@ -139,10 +137,10 @@ namespace net
 		return static_cast<int>(total_sent);
 	}
 
-	// receive() performs one blocking read into the caller-provided buffer.
-	// An empty span requires no OS call and returns 0 immediately. EINTR
-	// retries the operation recursively; a positive result is the number of
-	// bytes written into the buffer, and 0 can indicate a closed connection.
+	/********************************************************
+	 * Performs one blocking receive operation. An empty     *
+	 * buffer returns zero without calling the OS.           *
+	 ********************************************************/
 	std::expected<ssize_t, socket_error> socket::receive(std::span<std::byte> buffer)
 	{
 		if (buffer.empty())
@@ -160,4 +158,4 @@ namespace net
 
 		return static_cast<int>(bytes_read);
 	}
-} // namespace net
+} // namespace lynx::net

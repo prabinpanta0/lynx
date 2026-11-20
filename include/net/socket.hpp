@@ -22,6 +22,7 @@
 #include <span>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <system_error>
 #include <type_traits>
 #include <unistd.h>
 #include <utility>
@@ -29,6 +30,11 @@
 namespace lynx::net
 {
 	inline constexpr socket_handle invalid_socket_fd{-1};
+
+	[[nodiscard]] inline std::unexpected<socket_error> make_error(socket_operation operation, int error) noexcept
+	{
+		return std::unexpected{socket_error{std::error_code{error, std::generic_category()}, operation}};
+	}
 
 	class socket
 	{
@@ -40,35 +46,27 @@ namespace lynx::net
 		socket_handle sock_fd{invalid_socket_fd};
 
 		/****************************************************
-		 * Closes the current descriptor and optionally     *
-		 * replaces it with new_fd.                         *
-		 ****************************************************/
-		void reset( const socket_handle new_fd = invalid_socket_fd) noexcept;
-
-		/****************************************************
 		 * Takes ownership of a descriptor returned by      *
 		 * accept().                                        *
 		 ****************************************************/
 		explicit socket(int fd) noexcept : sock_fd(static_cast<socket_handle>(fd)) {};
 
+		void reset(const socket_handle new_fd = invalid_socket_fd) noexcept;
+
 	public:
-		/****************************************************
-		 * Closes the descriptor owned by this object.      *
-		 ****************************************************/
 		~socket();
 
-		/****************************************************
-		 * Transfers ownership and leaves the source object *
-		 * without a descriptor.                            *
-		 ****************************************************/
-		socket(socket&& other) noexcept : sock_fd(std::exchange(other.sock_fd, invalid_socket_fd))
-		{
-		}
+		/*
+		 * Transfers ownership and leaves the source object 
+		 * with an invalid descriptor.                   
+		 */
+		socket(socket&& other) noexcept : sock_fd(std::exchange(other.sock_fd, invalid_socket_fd)){}
 
-		/****************************************************
-		 * Closes this object's descriptor, then takes      *
-		 * ownership from the source object.                *
-		 ****************************************************/
+		/*
+		 * Closes this object's descriptor if valid, then takes      
+		 * ownership from the source object and assigns the source
+		 * descriptor with an invalid one.                
+		 */
 		socket& operator=(socket&& other) noexcept
 		{
 			if (this != &other)
@@ -78,37 +76,16 @@ namespace lynx::net
 			return *this;
 		};
 
-		/********************************************************
-		 * Creates a socket from the supplied configuration.    *
-		 ********************************************************/
-		[[nodiscard]] static std::expected<socket, socket_error> create(const socket_config& cfg) noexcept;
+		[[nodiscard]] static std::expected<socket, socket_error> create(const socket_config& config) noexcept;
 
-		/********************************************************
-		 * Assigns the socket to the specified local address.   *
-		 ********************************************************/
 		[[nodiscard]] std::expected<void, socket_error> bind(const socket_address& sock_addr) noexcept;
 
-		/********************************************************
-		 * Enables incoming connections using the requested     *
-		 * pending-connection backlog.                          *
-		 ********************************************************/
 		[[nodiscard]] std::expected<void, socket_error> listen(int backlog = SOMAXCONN) noexcept;
 
-		/********************************************************
-		 * Accepts one connection and returns a socket that     *
-		 * owns the accepted descriptor.                        *
-		 ********************************************************/
 		[[nodiscard]] std::expected<socket, socket_error> accept() noexcept;
 
-		/********************************************************
-		 * Sends data and reports the number of bytes sent.     *
-		 ********************************************************/
 		[[nodiscard]] std::expected<size_t, socket_error> send(std::span<const std::byte> data);
 
-		/********************************************************
-		 * Reads available data and reports the number of bytes *
-		 * received.                                            *
-		 ********************************************************/
 		[[nodiscard]] std::expected<size_t, socket_error> receive(std::span<std::byte> buffer);
 
 		/********************************************************
