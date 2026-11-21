@@ -54,9 +54,9 @@ namespace lynx::net
 	std::expected<socket, socket_error> socket::create(const socket_config& config) noexcept
 	{
 		const auto fd{::socket(static_cast<int>(config.domain),
-																   static_cast<int>(config.type),
-																   static_cast<int>(config.protocol))};
-		if ( static_cast<socket_handle>(fd) == invalid_socket_fd)
+							   static_cast<int>(config.type),
+							   static_cast<int>(config.protocol))};
+		if (static_cast<socket_handle>(fd) == invalid_socket_fd)
 		{
 			const int error{errno};
 			return make_error(socket_operation::create, error);
@@ -64,15 +64,19 @@ namespace lynx::net
 		return socket{fd};
 	};
 
-
-
 	/*
 	 * Converts the address to native form and binds the     
 	 * socket to that local endpoint.                        
 	 */
-	std::expected<void, socket_error> socket::bind(const socket_address& sock_addr)noexcept
+	std::expected<void, socket_error> socket::bind(const socket_address& sock_addr) noexcept
 	{
-
+		const auto addr{sock_addr.to_sockaddr_in()};
+		if (::bind(sock_fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) < 0)
+		{
+			const int error{errno};
+			return make_error(socket_operation::bind, error);
+		}
+		return {};
 	}
 
 	/********************************************************
